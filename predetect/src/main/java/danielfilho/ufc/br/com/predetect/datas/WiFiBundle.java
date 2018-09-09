@@ -3,6 +3,7 @@ package danielfilho.ufc.br.com.predetect.datas;
 import android.os.Parcel;
 import android.os.Parcelable;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -19,6 +20,7 @@ public class WiFiBundle implements Parcelable{
         this.distanceRange = distanceRange;
     }
 
+    @SuppressWarnings("unchecked")
     protected WiFiBundle(Parcel in) {
         wifiData = in.readArrayList(String.class.getClassLoader());
         observeTime = in.readInt();

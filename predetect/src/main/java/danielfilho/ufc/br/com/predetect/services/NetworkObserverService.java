@@ -19,16 +19,22 @@ import com.elvishew.xlog.printer.file.FilePrinter;
 
 import java.util.ArrayList;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.List;
 
-import danielfilho.ufc.br.com.predetect.constants.PredectConstants;
 import danielfilho.ufc.br.com.predetect.datas.WiFiBundle;
 import danielfilho.ufc.br.com.predetect.datas.WiFiData;
 import danielfilho.ufc.br.com.predetect.managers.NetworkManager;
 import danielfilho.ufc.br.com.predetect.managers.ParceableManager;
-import danielfilho.ufc.br.com.predetect.receivers.NetworkReceiver;
 import danielfilho.ufc.br.com.predetect.receivers.ObservingReceiver;
+
+import static danielfilho.ufc.br.com.predetect.constants.PreDetectConstants.ACTION_OBSERVING_ENDS;
+import static danielfilho.ufc.br.com.predetect.constants.PreDetectConstants.BUNDLE_FINISH_OBSERVING;
+import static danielfilho.ufc.br.com.predetect.constants.PreDetectConstants.LOG_PATH;
+import static danielfilho.ufc.br.com.predetect.constants.PreDetectConstants.LOG_TAG;
+import static danielfilho.ufc.br.com.predetect.constants.PreDetectConstants.RESULT_RECEIVER;
+import static danielfilho.ufc.br.com.predetect.constants.PreDetectConstants.SLEEP_ERROR;
+import static danielfilho.ufc.br.com.predetect.constants.PreDetectConstants.WIFI_BUNDLE;
+import static danielfilho.ufc.br.com.predetect.constants.PreDetectConstants.WIFI_SCANNED;
 
 /**
  * Created by Daniel Filho on 5/31/16.
@@ -38,7 +44,6 @@ public class NetworkObserverService extends Service implements Runnable{
     public static final int SERVICE_SUCCESS = 1;
     public static final int SERVICE_FAIL = 2;
     public static final int SERVICE_NO_WIFI = 3;
-
 
     private WifiManager wifiManager;
     private WiFiBundle wiFiBundle;
@@ -55,32 +60,36 @@ public class NetworkObserverService extends Service implements Runnable{
     public void onCreate() {
         super.onCreate();
         XLog.d("-------- SERVICE ON CREATE -------");
-        Log.d(PredectConstants.LOG_TAG, "-------- SERVICE ON CREATE -------");
+        Log.d(LOG_TAG, "-------- SERVICE ON CREATE -------");
     }
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
 
         try {
-            XLog.init(LogLevel.ALL, new FilePrinter.Builder(PredectConstants.LOG_PATH+"predetect").build());
-        }catch (Exception e){};
-
+            XLog.init(LogLevel.ALL, new FilePrinter.Builder(LOG_PATH + "pre_detect").build());
+        } catch (Exception e){
+            XLog.e(e.getMessage());
+        }
 
         this.powerManager = (PowerManager) getSystemService(POWER_SERVICE);
-        this.wakeLock = powerManager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "OBSERVING_WAKE_LOCK");
-        this.wakeLock.acquire();
+
+        if (powerManager != null) {
+            this.wakeLock = powerManager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "OBSERVING_WAKE_LOCK");
+            this.wakeLock.acquire(1000);
+        } else XLog.e("POWER MANAGER NULL");
 
         this.networkManager = NetworkManager.getInstance();
         this.networkManager.holdWifiLock(this);
 
-        wifiManager = (WifiManager) getSystemService(Context.WIFI_SERVICE);
+        wifiManager = (WifiManager) getApplicationContext().getSystemService(Context.WIFI_SERVICE);
 
         try {
-            XLog.init(LogLevel.ALL, new FilePrinter.Builder(PredectConstants.LOG_PATH).build());
-        }catch (Exception e){};
+            XLog.init(LogLevel.ALL, new FilePrinter.Builder(LOG_PATH).build());
+        } catch (Exception e){ XLog.e(e.getMessage());}
 
 
-        Log.d(PredectConstants.LOG_TAG, "--------- CREATING THE SERVICE ---------");
+        Log.d(LOG_TAG, "--------- CREATING THE SERVICE ---------");
         XLog.d("--------- CREATING THE SERVICE ---------");
 
         initBundle(intent);
@@ -90,7 +99,6 @@ public class NetworkObserverService extends Service implements Runnable{
         return START_REDELIVER_INTENT;
 
     }
-
 
     @Nullable
     @Override
@@ -109,14 +117,14 @@ public class NetworkObserverService extends Service implements Runnable{
     private void initBundle(Intent intent){
         try {
 
-            wiFiBundle = ParceableManager.toParcelable(intent.getByteArrayExtra(PredectConstants.WIFI_BUNDLE), WiFiBundle.CREATOR);
-            networkResultReceiver = intent.getParcelableExtra(PredectConstants.RESULT_RECEIVER);
+            wiFiBundle = ParceableManager.toParcelable(intent.getByteArrayExtra(WIFI_BUNDLE), WiFiBundle.CREATOR);
+            networkResultReceiver = intent.getParcelableExtra(RESULT_RECEIVER);
             if(wiFiBundle != null) {
                 new Thread(this).start();
-                Log.d(PredectConstants.LOG_TAG, "--------- SERVICE STARTED ---------");
+                Log.d(LOG_TAG, "--------- SERVICE STARTED ---------");
                 XLog.d(System.currentTimeMillis()+"|  --------- SERVICE STARTED ---------");
             }else{
-                Log.d(PredectConstants.LOG_TAG, "--------- SERVICE START ERROR: WiFi Bundle is NULL ---------");
+                Log.d(LOG_TAG, "--------- SERVICE START ERROR: WiFi Bundle is NULL ---------");
                 XLog.d(System.currentTimeMillis()+"|  --------- SERVICE START ERROR: WiFi Bundle is NULL ---------");
                 if(networkResultReceiver != null){
                     networkResultReceiver.send(SERVICE_FAIL, null);
@@ -131,13 +139,12 @@ public class NetworkObserverService extends Service implements Runnable{
         HashSet<WiFiData> hashWifi = new HashSet<>();
         for(ScanResult sr : scanResults){
             WiFiData temp = new WiFiData(sr.BSSID);
+
             if(!hashWifi.contains(temp)) {
                 double resultDistance = NetworkManager.rssiToDistance(sr.level);
                 WiFiData data = new WiFiData(sr.BSSID, sr.level, resultDistance, sr.SSID);
                 XLog.d(sr.BSSID+","+ sr.SSID+","+sr.level+","+resultDistance);
                 hashWifi.add(data);
-            }else{
-//                Log.d(PredectConstants.LOG_TAG, "--------- There's one WiFi duplicated on WiFiManager ScanResults ---------");
             }
         }
         return hashWifi;
@@ -168,10 +175,7 @@ public class NetworkObserverService extends Service implements Runnable{
             HashSet<WiFiData> wiFiDataCollection = removeReplicatedWifi(wifiManager.getScanResults());
 
             if(wiFiDataCollection.size() > 0){
-                Iterator<WiFiData> iterator = wiFiDataCollection.iterator();
-                while(iterator.hasNext()){
-                    WiFiData wifiScan = iterator.next();
-
+                for (WiFiData wifiScan : wiFiDataCollection) {
                     for (WiFiData wiFiData : wiFiDatas) {
                         if (wiFiData.getMAC().equals(wifiScan.getMAC()) && wiFiBundle.getDistanceRange() >= wifiScan.getDistance()) {
 
@@ -180,7 +184,7 @@ public class NetworkObserverService extends Service implements Runnable{
 
                             int newAppear = wiFiData.getObserveCount();
                             wiFiData.setObserveCount(++newAppear);
-                            Log.d(PredectConstants.LOG_TAG, "PERCENT: "+percent);
+                            Log.d(LOG_TAG, "PERCENT: " + percent);
                         }
                     }
 
@@ -188,7 +192,7 @@ public class NetworkObserverService extends Service implements Runnable{
                 try {
                     Thread.sleep(60000);
                 } catch (InterruptedException e) {
-                    Log.e(PredectConstants.LOG_TAG, PredectConstants.SLEEP_ERROR);
+                    Log.e(LOG_TAG, SLEEP_ERROR);
 
                     if(networkResultReceiver != null)
                         networkResultReceiver.send(SERVICE_FAIL, null);
@@ -204,22 +208,23 @@ public class NetworkObserverService extends Service implements Runnable{
             }
 
         }
-        XLog.d(System.currentTimeMillis()+"|  --------- SERVICE ENDS ---------");
-        Log.d(PredectConstants.LOG_TAG, "--------- SERVICE ENDS ---------");
+
+        XLog.d(System.currentTimeMillis() + "|  --------- SERVICE ENDS ---------");
+        Log.d(LOG_TAG, "--------- SERVICE ENDS ---------");
 
         /*
-            Seding the result for the result receiver
+            Sending the result for the result receiver
             telling that network observing end
          */
         Bundle bundle = new Bundle();
-        bundle.putParcelableArrayList(PredectConstants.WIFI_SCANNED, (ArrayList<? extends Parcelable>) wiFiDatas);
-        
+        bundle.putParcelableArrayList(WIFI_SCANNED, (ArrayList<? extends Parcelable>) wiFiDatas);
+
         if(networkResultReceiver != null)
             networkResultReceiver.send(SERVICE_SUCCESS, bundle);
 
         //Send the intent for the broadcasts receivers
-        Intent intent = new Intent(PredectConstants.ACTION_OBSERVING_ENDS);
-        intent.putExtra(PredectConstants.BUNDLE_FINISH_OBSERVING, bundle);
+        Intent intent = new Intent(ACTION_OBSERVING_ENDS);
+        intent.putExtra(BUNDLE_FINISH_OBSERVING, bundle);
         sendBroadcast(intent);
 
 
@@ -227,10 +232,5 @@ public class NetworkObserverService extends Service implements Runnable{
 
         stopSelf();
     }
-
-
-
-
-
 
 }

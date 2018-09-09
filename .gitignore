@@ -1,4 +1,5 @@
-
+.idea/
+.idea/**
 # Created by https://www.gitignore.io/api/java,android,androidstudio
 
 ### Android ###

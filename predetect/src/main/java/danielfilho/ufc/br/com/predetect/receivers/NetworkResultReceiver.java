@@ -7,9 +7,11 @@ import android.util.Log;
 
 import java.util.List;
 
-import danielfilho.ufc.br.com.predetect.constants.PredectConstants;
 import danielfilho.ufc.br.com.predetect.datas.WiFiData;
 import danielfilho.ufc.br.com.predetect.intefaces.WiFiObserver;
+
+import static danielfilho.ufc.br.com.predetect.constants.PreDetectConstants.LOG_TAG;
+import static danielfilho.ufc.br.com.predetect.constants.PreDetectConstants.WIFI_SCANNED;
 
 /**
  * Created by Daniel Filho on 6/15/16.
@@ -29,10 +31,10 @@ public class NetworkResultReceiver extends ResultReceiver {
     @Override
     protected void onReceiveResult(int resultCode, Bundle resultData) {
         if(wiFiObserver != null) {
-            List<WiFiData> wiFiDatas = resultData.getParcelableArrayList(PredectConstants.WIFI_SCANNED);
-            wiFiObserver.onWiFiObservingEnds(resultCode, wiFiDatas);
+            List<WiFiData> wifiData = resultData.getParcelableArrayList(WIFI_SCANNED);
+            wiFiObserver.onWiFiObservingEnds(resultCode, wifiData);
         }else{
-            Log.e(PredectConstants.LOG_TAG, "---------- COULD NOT SEND MESSAGE TO WIFI OBSERVER, BECAUSE IT'S NULL ----------");
+            Log.e(LOG_TAG, "---------- COULD NOT SEND MESSAGE TO WIFI OBSERVER, BECAUSE IT'S NULL ----------");
         }
     }
 }

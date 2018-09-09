@@ -1,15 +1,17 @@
 package danielfilho.ufc.br.com.predetect.constants;
 
+import android.os.Environment;
+
 /**
  * Created by whoami on 5/31/16.
  */
-public class PredectConstants {
+public class PreDetectConstants{
 
     //Log tag
-    public static final String LOG_TAG = "LOG_PREDECT";
+    public static final String LOG_TAG = "LOG_PRE_DETECT";
 
     //Log path
-    public static final String LOG_PATH = "/sdcard/";
+    public static final String LOG_PATH = Environment.getExternalStorageDirectory().getPath();
 
     //Error messages
     public static final String SLEEP_ERROR = "Error at Thread Sleep in NetworkObserverService";
